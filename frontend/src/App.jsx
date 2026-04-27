@@ -201,10 +201,8 @@ export default function App() {
 
   const hasLocation = location.latitude !== null && location.longitude !== null;
   const mapUrl = hasLocation
-    ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}(You)|${hospitalPins
-        .map((h) => `${h.lat},${h.lon}(${h.name})`)
-        .join('|')}&z=15&output=embed`
-    : '';
+  ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}&z=15&output=embed`
+  : '';
 
   const cardStyle = {
     background: 'white',
@@ -212,6 +210,10 @@ export default function App() {
     borderRadius: '10px',
     marginBottom: '16px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  };
+  const calculateETA = (distance) => {
+    const speed = 40; // km/h
+    return Math.round((distance / speed) * 60);
   };
 
   return (
@@ -300,6 +302,8 @@ export default function App() {
               📞 Phone: {nearestAmbulance.phone}
               <br />
               📍 Distance: {nearestAmbulance.distance} km
+              <br />
+    ⏱️ ETA: {calculateETA(nearestAmbulance.distance)} minutes
             </p>
           )}
           {nearestAmbulance && (
