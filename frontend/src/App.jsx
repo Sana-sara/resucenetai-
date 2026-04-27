@@ -12,6 +12,10 @@ const ambulances = [
   { name: 'City Care Ambulance', distance: 2.5, phone: '102' },
   { name: 'Apollo Ambulance', distance: 3, phone: '040-123456' },
 ];
+const hospitalPins = [
+  { name: 'Apollo', lat: 17.385, lon: 78.486 },
+  { name: 'Yashoda', lat: 17.412, lon: 78.478 },
+];
 
 export default function App() {
   const [location, setLocation] = useState({ latitude: null, longitude: null });
@@ -57,6 +61,15 @@ export default function App() {
     }
 
     return 'LOW';
+  };
+
+  // Explainable AI reason for detected text.
+  const getReason = (text) => {
+    const lower = text.toLowerCase();
+    if (lower.includes('accident')) return 'Detected accident-related emergency';
+    if (lower.includes('fire')) return 'Detected fire emergency';
+    if (lower.includes('help')) return 'User requested help';
+    return 'No critical keywords detected';
   };
 
   // Select best hospital: HIGH availability first, then nearest by distance.
@@ -131,6 +144,8 @@ export default function App() {
 
   // Send SOS alert to backend.
   const sendSOS = async (reason = 'Manual') => {
+    let coords = null;
+
     setIsSending(true);
     setMessage('Sending alert...');
     setStats((prev) => ({
@@ -141,8 +156,12 @@ export default function App() {
     setNearestAmbulance(selectNearestAmbulance());
 
     try {
-      const coords = await getLocation();
+      coords = await getLocation();
       setLocation(coords);
+
+      if (!navigator.onLine) {
+        throw new Error('Offline mode detected');
+      }
 
       const res = await fetch(`${API_BASE_URL}/sos`, {
         method: 'POST',
@@ -158,6 +177,11 @@ export default function App() {
       setMessage(`✅ Emergency alert sent successfully (${reason})`);
       await fetchHistory();
     } catch {
+      const fallbackCoords = coords || location;
+      if (fallbackCoords?.latitude !== null && fallbackCoords?.longitude !== null) {
+        const smsBody = `HELP! Emergency at Lat: ${fallbackCoords.latitude}, Lon: ${fallbackCoords.longitude}`;
+        window.open(`sms:108?body=${encodeURIComponent(smsBody)}`);
+      }
       setMessage('❌ Failed to send SOS');
     } finally {
       setIsSending(false);
@@ -177,7 +201,9 @@ export default function App() {
 
   const hasLocation = location.latitude !== null && location.longitude !== null;
   const mapUrl = hasLocation
-    ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}&z=15&output=embed`
+    ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}(You)|${hospitalPins
+        .map((h) => `${h.lat},${h.lon}(${h.name})`)
+        .join('|')}&z=15&output=embed`
     : '';
 
   const cardStyle = {
@@ -255,6 +281,7 @@ export default function App() {
           >
             Priority: {priority}
           </p>
+          <p style={{ marginTop: '8px' }}>Reason: {getReason(inputText)}</p>
         </div>
 
         <div style={cardStyle}>
@@ -274,6 +301,22 @@ export default function App() {
               <br />
               📍 Distance: {nearestAmbulance.distance} km
             </p>
+          )}
+          {nearestAmbulance && (
+            <a
+              href={`tel:${nearestAmbulance.phone}`}
+              style={{
+                display: 'inline-block',
+                background: '#e0e0e0',
+                color: '#222',
+                textDecoration: 'none',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                marginTop: '8px',
+              }}
+            >
+              Call Ambulance
+            </a>
           )}
         </div>
 
@@ -309,6 +352,11 @@ export default function App() {
               height="240"
               style={{ border: 0, borderRadius: '8px' }}
             />
+            <div style={{ marginTop: '10px' }}>
+              <strong>Nearby Hospitals:</strong>
+              <div>- Apollo</div>
+              <div>- Yashoda</div>
+            </div>
           </div>
         )}
 
