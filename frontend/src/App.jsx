@@ -4,29 +4,37 @@ const API_BASE_URL = 'http://127.0.0.1:5000';
 const EMERGENCY_KEYWORDS = ['help', 'accident', 'fire'];
 
 function App() {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState('Ready');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [location, setLocation] = useState(null);
+  const [location, setLocation] = useState({ latitude: null, longitude: null });
   const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [inputText, setInputText] = useState('');
 
-  // Prevent repeated auto-triggering for the same detected text.
+  // Prevent repeated auto-triggering for the same exact text.
   const lastAutoTriggeredText = useRef('');
 
   const fetchHistory = async () => {
+    setHistoryLoading(true);
+
     try {
       const response = await fetch(`${API_BASE_URL}/sos/history`);
       const data = await response.json();
 
-      if (response.ok && data.status === 'success') {
-        setHistory(data.alerts || []);
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(data.message || 'Could not load SOS history.');
       }
-    } catch {
-      // Keep silent here so initial load remains simple for beginners.
+
+      setHistory(data.alerts || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load history.');
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
+  // Load history as soon as the page opens.
   useEffect(() => {
     fetchHistory();
   }, []);
@@ -64,6 +72,7 @@ function App() {
       setLocation(coords);
       setMessage(`Sending SOS alert... (${reason})`);
 
+      // Frontend calls Flask backend at 127.0.0.1:5000.
       const response = await fetch(`${API_BASE_URL}/sos`, {
         method: 'POST',
         headers: {
@@ -82,13 +91,13 @@ function App() {
       await fetchHistory();
     } catch (err) {
       setError(err.message || 'Something went wrong while sending SOS.');
-      setMessage('');
+      setMessage('SOS failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // AI simulation: auto-trigger SOS when dangerous keywords are typed.
+  // AI simulation: if user types emergency keywords, trigger SOS automatically.
   useEffect(() => {
     const lowerText = inputText.toLowerCase();
     const hasEmergencyWord = EMERGENCY_KEYWORDS.some((word) => lowerText.includes(word));
@@ -111,22 +120,24 @@ function App() {
         fontFamily: 'Arial, sans-serif',
         textAlign: 'center',
         padding: '2rem',
+        backgroundColor: '#f7f8fa',
       }}
     >
       <h1>RescueNet AI+ Emergency Console</h1>
 
-      {/* AI simulation input box */}
+      {/* AI keyword box */}
       <input
         type="text"
         value={inputText}
         onChange={(event) => setInputText(event.target.value)}
-        placeholder="Type emergency words (help, accident, fire)..."
+        placeholder="Type: help, accident, fire"
         style={{
           width: 'min(500px, 90vw)',
           padding: '0.75rem 1rem',
           fontSize: '1rem',
           borderRadius: '8px',
           border: '1px solid #ccc',
+          backgroundColor: '#fff',
         }}
       />
 
@@ -143,40 +154,62 @@ function App() {
           fontSize: '2rem',
           fontWeight: 'bold',
           cursor: loading ? 'not-allowed' : 'pointer',
+          boxShadow: '0 6px 16px rgba(0,0,0,0.15)',
         }}
       >
         {loading ? 'Sending...' : '🚨 SOS'}
       </button>
 
-      {message && <p style={{ color: '#0a7d20' }}>{message}</p>}
-      {error && <p style={{ color: '#c62828' }}>{error}</p>}
+      {/* Status panel */}
+      <section
+        style={{
+          width: 'min(700px, 95vw)',
+          backgroundColor: '#fff',
+          border: '1px solid #e6e6e6',
+          borderRadius: '10px',
+          padding: '1rem',
+        }}
+      >
+        <h3>Status</h3>
+        {loading && <p>⏳ Loading: sending your SOS alert...</p>}
+        {!loading && <p>ℹ️ {message}</p>}
+        {error && <p style={{ color: '#c62828' }}>❌ Error: {error}</p>}
+      </section>
 
-      {location && (
-        <section>
-          <h3>Your Live Location</h3>
-          <p>
-            <strong>Latitude:</strong> {location.latitude}
-            <br />
-            <strong>Longitude:</strong> {location.longitude}
-          </p>
+      {/* Live location panel */}
+      <section
+        style={{
+          width: 'min(700px, 95vw)',
+          backgroundColor: '#fff',
+          border: '1px solid #e6e6e6',
+          borderRadius: '10px',
+          padding: '1rem',
+        }}
+      >
+        <h3>Your Live Location</h3>
+        <p>
+          <strong>Latitude:</strong>{' '}
+          {location.latitude !== null ? location.latitude : 'Not available yet'}
+          <br />
+          <strong>Longitude:</strong>{' '}
+          {location.longitude !== null ? location.longitude : 'Not available yet'}
+        </p>
+      </section>
 
-          {/* Optional simple map preview using Google Maps iframe */}
-          <iframe
-            title="Live Location Map"
-            width="320"
-            height="220"
-            style={{ border: 0, borderRadius: '8px' }}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            src={`https://maps.google.com/maps?q=${location.latitude},${location.longitude}&z=15&output=embed`}
-          />
-        </section>
-      )}
-
-      <section style={{ width: 'min(700px, 95vw)', marginTop: '1rem' }}>
+      {/* History panel */}
+      <section
+        style={{
+          width: 'min(700px, 95vw)',
+          backgroundColor: '#fff',
+          border: '1px solid #e6e6e6',
+          borderRadius: '10px',
+          padding: '1rem',
+        }}
+      >
         <h3>SOS Alert History</h3>
-
-        {history.length === 0 ? (
+        {historyLoading ? (
+          <p>Loading history...</p>
+        ) : history.length === 0 ? (
           <p>No SOS alerts yet.</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left' }}>
