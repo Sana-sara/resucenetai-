@@ -25,6 +25,7 @@ This uses `concurrently` to start:
 - React frontend from `frontend` using `npm run dev`
 
 ## Manual quick start (optional)
+## Quick start
 
 ### Frontend
 ```bash
