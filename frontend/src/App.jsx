@@ -2,12 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 
 const API_BASE_URL = 'http://127.0.0.1:5000';
 const TRIGGER_KEYWORDS = ['help', 'accident', 'fire'];
+const hospitals = [
+  { name: 'Apollo', distance: 2, availability: 'low' },
+  { name: 'Yashoda', distance: 5, availability: 'high' },
+  { name: 'Care Hospital', distance: 3, availability: 'medium' },
+];
 
 export default function App() {
   const [location, setLocation] = useState({ latitude: null, longitude: null });
   const [history, setHistory] = useState([]);
   const [inputText, setInputText] = useState('');
   const [priority, setPriority] = useState('LOW');
+  const [recommendedHospital, setRecommendedHospital] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -45,6 +51,19 @@ export default function App() {
     return 'LOW';
   };
 
+  // Select best hospital: HIGH availability first, then nearest by distance.
+  const selectBestHospital = () => {
+    const availabilityRank = { high: 3, medium: 2, low: 1 };
+
+    const sorted = [...hospitals].sort((a, b) => {
+      const rankDiff = availabilityRank[b.availability] - availabilityRank[a.availability];
+      if (rankDiff !== 0) return rankDiff;
+      return a.distance - b.distance;
+    });
+
+    return sorted[0] || null;
+  };
+
   // Get browser geolocation as a Promise.
   const getLocation = () =>
     new Promise((resolve, reject) => {
@@ -67,6 +86,7 @@ export default function App() {
   const sendSOS = async (reason = 'Manual') => {
     setIsSending(true);
     setMessage('Sending alert...');
+    setRecommendedHospital(selectBestHospital());
 
     try {
       const coords = await getLocation();
@@ -129,6 +149,13 @@ export default function App() {
       >
         Priority: {priority}
       </p>
+      {recommendedHospital && (
+        <p>
+          Recommended Hospital: {recommendedHospital.name} (
+          {recommendedHospital.availability.charAt(0).toUpperCase() + recommendedHospital.availability.slice(1)}{' '}
+          availability)
+        </p>
+      )}
 
       <br />
       <br />
