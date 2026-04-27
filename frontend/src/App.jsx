@@ -7,6 +7,11 @@ const hospitals = [
   { name: 'Yashoda', distance: 5, availability: 'high' },
   { name: 'Care Hospital', distance: 3, availability: 'medium' },
 ];
+const ambulances = [
+  { name: 'Red Cross Ambulance', distance: 1.5, phone: '108' },
+  { name: 'City Care Ambulance', distance: 2.5, phone: '102' },
+  { name: 'Apollo Ambulance', distance: 3, phone: '040-123456' },
+];
 
 export default function App() {
   const [location, setLocation] = useState({ latitude: null, longitude: null });
@@ -14,6 +19,7 @@ export default function App() {
   const [inputText, setInputText] = useState('');
   const [priority, setPriority] = useState('LOW');
   const [recommendedHospital, setRecommendedHospital] = useState(null);
+  const [nearestAmbulance, setNearestAmbulance] = useState(null);
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -64,6 +70,12 @@ export default function App() {
     return sorted[0] || null;
   };
 
+  // Select nearest ambulance (smallest distance).
+  const selectNearestAmbulance = () => {
+    const sorted = [...ambulances].sort((a, b) => a.distance - b.distance);
+    return sorted[0] || null;
+  };
+
   // Get browser geolocation as a Promise.
   const getLocation = () =>
     new Promise((resolve, reject) => {
@@ -87,6 +99,7 @@ export default function App() {
     setIsSending(true);
     setMessage('Sending alert...');
     setRecommendedHospital(selectBestHospital());
+    setNearestAmbulance(selectNearestAmbulance());
 
     try {
       const coords = await getLocation();
@@ -154,6 +167,15 @@ export default function App() {
           Recommended Hospital: {recommendedHospital.name} (
           {recommendedHospital.availability.charAt(0).toUpperCase() + recommendedHospital.availability.slice(1)}{' '}
           availability)
+        </p>
+      )}
+      {nearestAmbulance && (
+        <p>
+          🚑 Nearest Ambulance: {nearestAmbulance.name}
+          <br />
+          📞 Phone: {nearestAmbulance.phone}
+          <br />
+          📍 Distance: {nearestAmbulance.distance} km
         </p>
       )}
 
