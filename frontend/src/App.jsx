@@ -180,79 +180,147 @@ export default function App() {
     ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}&z=15&output=embed`
     : '';
 
-  return (
-    <div style={{ textAlign: 'center', padding: '2rem' }}>
-      <h1>RescueNet AI+</h1>
-      <div style={{ marginBottom: '1rem' }}>
-        <h3>🚨 Emergency Dashboard</h3>
-        <p style={{ color: 'red', margin: '4px 0' }}>High: {stats.HIGH}</p>
-        <p style={{ color: 'orange', margin: '4px 0' }}>Medium: {stats.MEDIUM}</p>
-        <p style={{ color: 'green', margin: '4px 0' }}>Low: {stats.LOW}</p>
-      </div>
+  const cardStyle = {
+    background: 'white',
+    padding: '16px',
+    borderRadius: '10px',
+    marginBottom: '16px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  };
 
-      <input
-        placeholder="Type: help, accident, fire"
-        value={inputText}
-        onChange={(e) => {
-          const newText = e.target.value;
-          setInputText(newText);
-          setPriority(detectPriority(newText));
-        }}
-      />
-      <br />
-      <br />
-      <button onClick={startVoiceRecognition} disabled={isListening}>
-        {isListening ? '🎤 Listening...' : '🎤 Start Voice Input'}
-      </button>
-      <p
+  return (
+    <div style={{ background: '#f5f7fa', minHeight: '100vh', padding: '20px' }}>
+      <div
         style={{
-          color: priority === 'HIGH' ? 'red' : priority === 'MEDIUM' ? 'orange' : 'green',
-          fontWeight: 'bold',
+          maxWidth: '650px',
+          margin: '0 auto',
+          padding: '20px',
+          textAlign: 'center',
+          color: '#2f2f2f',
+          fontFamily: 'Arial, sans-serif',
         }}
       >
-        Priority: {priority}
-      </p>
-      {recommendedHospital && (
-        <p>
-          Recommended Hospital: {recommendedHospital.name} (
-          {recommendedHospital.availability.charAt(0).toUpperCase() + recommendedHospital.availability.slice(1)}{' '}
-          availability)
-        </p>
-      )}
-      {nearestAmbulance && (
-        <p>
-          🚑 Nearest Ambulance: {nearestAmbulance.name}
-          <br />
-          📞 Phone: {nearestAmbulance.phone}
-          <br />
-          📍 Distance: {nearestAmbulance.distance} km
-        </p>
-      )}
+        <h1 style={{ fontSize: '28px', marginBottom: '16px' }}>RescueNet AI+</h1>
 
-      <br />
-      <br />
-
-      <button onClick={() => sendSOS()} disabled={isSending}>
-        {isSending ? 'Sending...' : '🚨 SOS'}
-      </button>
-
-      <p>{message}</p>
-
-      {hasLocation && (
-        <>
-          <p>
-            Lat: {location.latitude}, Lon: {location.longitude}
-          </p>
-          <iframe title="Location Map" src={mapUrl} width="300" height="200" />
-        </>
-      )}
-
-      <h3>History</h3>
-      {history.map((h) => (
-        <div key={h.id || `${h.latitude}-${h.longitude}-${h.timestamp || ''}`}>
-          {h.latitude}, {h.longitude} {h.timestamp ? `(${new Date(h.timestamp).toLocaleString()})` : ''}
+        <div style={cardStyle}>
+          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>🚨 Emergency Dashboard</h3>
+          <p style={{ color: 'red', margin: '6px 0' }}>High: {stats.HIGH}</p>
+          <p style={{ color: 'orange', margin: '6px 0' }}>Medium: {stats.MEDIUM}</p>
+          <p style={{ color: 'green', margin: '6px 0' }}>Low: {stats.LOW}</p>
         </div>
-      ))}
+
+        <div style={cardStyle}>
+          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Input + Voice</h3>
+          <input
+            placeholder="Type: help, accident, fire"
+            value={inputText}
+            onChange={(e) => {
+              const newText = e.target.value;
+              setInputText(newText);
+              setPriority(detectPriority(newText));
+            }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: '8px',
+              border: '1px solid #cfcfcf',
+              marginBottom: '12px',
+              boxSizing: 'border-box',
+            }}
+          />
+          <button
+            onClick={startVoiceRecognition}
+            disabled={isListening}
+            style={{
+              background: '#e0e0e0',
+              color: '#333',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              cursor: 'pointer',
+            }}
+          >
+            {isListening ? '🎤 Listening...' : '🎤 Start Voice Input'}
+          </button>
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Priority</h3>
+          <p
+            style={{
+              color: priority === 'HIGH' ? 'red' : priority === 'MEDIUM' ? 'orange' : 'green',
+              fontWeight: 'bold',
+              margin: 0,
+            }}
+          >
+            Priority: {priority}
+          </p>
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Hospital + Ambulance</h3>
+          {recommendedHospital && (
+            <p style={{ margin: '6px 0' }}>
+              Recommended Hospital: {recommendedHospital.name} (
+              {recommendedHospital.availability.charAt(0).toUpperCase() + recommendedHospital.availability.slice(1)}{' '}
+              availability)
+            </p>
+          )}
+          {nearestAmbulance && (
+            <p style={{ margin: '6px 0' }}>
+              🚑 Nearest Ambulance: {nearestAmbulance.name}
+              <br />
+              📞 Phone: {nearestAmbulance.phone}
+              <br />
+              📍 Distance: {nearestAmbulance.distance} km
+            </p>
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>SOS</h3>
+          <button
+            onClick={() => sendSOS()}
+            disabled={isSending}
+            style={{
+              background: '#d32f2f',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 20px',
+              cursor: 'pointer',
+            }}
+          >
+            {isSending ? 'Sending...' : '🚨 SOS'}
+          </button>
+          <p style={{ marginTop: '12px' }}>{message}</p>
+        </div>
+
+        {hasLocation && (
+          <div style={cardStyle}>
+            <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Map</h3>
+            <p style={{ margin: '6px 0' }}>
+              Lat: {location.latitude}, Lon: {location.longitude}
+            </p>
+            <iframe
+              title="Location Map"
+              src={mapUrl}
+              width="100%"
+              height="240"
+              style={{ border: 0, borderRadius: '8px' }}
+            />
+          </div>
+        )}
+
+        <div style={cardStyle}>
+          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>History</h3>
+          {history.map((h) => (
+            <div key={h.id || `${h.latitude}-${h.longitude}-${h.timestamp || ''}`} style={{ marginBottom: '6px' }}>
+              {h.latitude}, {h.longitude} {h.timestamp ? `(${new Date(h.timestamp).toLocaleString()})` : ''}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
