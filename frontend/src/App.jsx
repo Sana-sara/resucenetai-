@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 
 const API_BASE_URL = 'http://127.0.0.1:5000';
-const TRIGGER_KEYWORDS = ['help', 'accident', 'fire'];
+const TRIGGER_KEYWORDS = ['help', 'accident', 'fire', 'bleeding'];
+
 const hospitals = [
-  { name: 'Apollo', distance: 2, availability: 'low' },
-  { name: 'Yashoda', distance: 5, availability: 'high' },
-  { name: 'Care Hospital', distance: 3, availability: 'medium' },
+  { name: 'City General Hospital', lat: 17.401, lon: 78.477, beds: 4, type: 'general' },
+  { name: 'Apollo Trauma Center', lat: 17.385, lon: 78.486, beds: 6, type: 'trauma' },
+  { name: 'Yashoda Emergency Care', lat: 17.412, lon: 78.478, beds: 3, type: 'general' },
+  { name: 'Metro Trauma Hospital', lat: 17.39, lon: 78.47, beds: 2, type: 'trauma' },
 ];
+
 const ambulances = [
-  { name: 'Red Cross Ambulance', distance: 1.5, phone: '108' },
-  { name: 'City Care Ambulance', distance: 2.5, phone: '102' },
-  { name: 'Apollo Ambulance', distance: 3, phone: '040-123456' },
-];
-const hospitalPins = [
-  { name: 'Apollo', lat: 17.385, lon: 78.486 },
-  { name: 'Yashoda', lat: 17.412, lon: 78.478 },
+  { name: 'Red Cross Ambulance', lat: 17.398, lon: 78.482, phone: '108' },
+  { name: 'City Care Ambulance', lat: 17.407, lon: 78.49, phone: '102' },
+  { name: 'Apollo Ambulance', lat: 17.382, lon: 78.475, phone: '040-123456' },
 ];
 
 export default function App() {
@@ -36,8 +35,6 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE_URL}/sos/history`);
       const data = await res.json();
-
-      // Supports both { data: [...] } and { alerts: [...] } response shapes.
       setHistory(data.data || data.alerts || []);
     } catch {
       setMessage('⚠️ Failed to load history');
@@ -51,43 +48,84 @@ export default function App() {
   // Detect AI severity priority from user text.
   const detectPriority = (text) => {
     const lower = text.toLowerCase();
-
-    if (lower.includes('accident') || lower.includes('fire')) {
-      return 'HIGH';
-    }
-
-    if (lower.includes('help')) {
-      return 'MEDIUM';
-    }
-
+    if (lower.includes('bleeding') || lower.includes('accident') || lower.includes('fire')) return 'HIGH';
+    if (lower.includes('help')) return 'MEDIUM';
     return 'LOW';
   };
 
   // Explainable AI reason for detected text.
   const getReason = (text) => {
     const lower = text.toLowerCase();
+    if (lower.includes('bleeding')) return 'Detected bleeding-related emergency';
     if (lower.includes('accident')) return 'Detected accident-related emergency';
     if (lower.includes('fire')) return 'Detected fire emergency';
     if (lower.includes('help')) return 'User requested help';
     return 'No critical keywords detected';
   };
 
-  // Select best hospital: HIGH availability first, then nearest by distance.
-  const selectBestHospital = () => {
-    const availabilityRank = { high: 3, medium: 2, low: 1 };
+  // Helper: Haversine distance between two geo points (km).
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const earthRadius = 6371;
 
-    const sorted = [...hospitals].sort((a, b) => {
-      const rankDiff = availabilityRank[b.availability] - availabilityRank[a.availability];
-      if (rankDiff !== 0) return rankDiff;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadius * c;
+  };
+
+  // Helper: Select best hospital by condition + bed availability + distance.
+  const selectBestHospital = (userLat, userLon, text) => {
+    const condition = text.toLowerCase();
+
+    const hospitalWithDistance = hospitals.map((hospital) => ({
+      ...hospital,
+      distance: calculateDistance(userLat, userLon, hospital.lat, hospital.lon),
+    }));
+
+    const traumaPriority = condition.includes('bleeding') || condition.includes('accident');
+    const fireCase = condition.includes('fire');
+
+    const sorted = [...hospitalWithDistance].sort((a, b) => {
+      if (fireCase) {
+        return a.distance - b.distance;
+      }
+
+      if (traumaPriority) {
+        if (a.type !== b.type) {
+          return a.type === 'trauma' ? -1 : 1;
+        }
+      }
+
+      if (a.beds !== b.beds) {
+        return b.beds - a.beds;
+      }
+
       return a.distance - b.distance;
     });
 
     return sorted[0] || null;
   };
 
-  // Select nearest ambulance (smallest distance).
-  const selectNearestAmbulance = () => {
-    const sorted = [...ambulances].sort((a, b) => a.distance - b.distance);
+  // Select nearest ambulance and estimate ETA by distance.
+  const selectNearestAmbulance = (userLat, userLon) => {
+    const withDistance = ambulances.map((ambulance) => {
+      const distance = calculateDistance(userLat, userLon, ambulance.lat, ambulance.lon);
+      const eta = Math.max(3, Math.round(distance * 4)); // simple ETA rule: ~4 min per km
+
+      return {
+        ...ambulance,
+        distance,
+        eta,
+      };
+    });
+
+    const sorted = [...withDistance].sort((a, b) => a.distance - b.distance);
     return sorted[0] || null;
   };
 
@@ -152,12 +190,16 @@ export default function App() {
       ...prev,
       [priority]: prev[priority] + 1,
     }));
-    setRecommendedHospital(selectBestHospital());
-    setNearestAmbulance(selectNearestAmbulance());
 
     try {
       coords = await getLocation();
       setLocation(coords);
+
+      const bestHospital = selectBestHospital(coords.latitude, coords.longitude, inputText);
+      const bestAmbulance = selectNearestAmbulance(coords.latitude, coords.longitude);
+
+      setRecommendedHospital(bestHospital);
+      setNearestAmbulance(bestAmbulance);
 
       if (!navigator.onLine) {
         throw new Error('Offline mode detected');
@@ -182,7 +224,7 @@ export default function App() {
         const smsBody = `HELP! Emergency at Lat: ${fallbackCoords.latitude}, Lon: ${fallbackCoords.longitude}`;
         window.open(`sms:108?body=${encodeURIComponent(smsBody)}`);
       }
-      setMessage('❌ Failed to send SOS');
+      setMessage('❌ Failed to send SOS (SMS fallback launched)');
     } finally {
       setIsSending(false);
     }
@@ -200,47 +242,49 @@ export default function App() {
   }, [inputText, isSending]);
 
   const hasLocation = location.latitude !== null && location.longitude !== null;
-  const mapUrl = hasLocation
-  ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}&z=15&output=embed`
-  : '';
+  const mapUrl = hasLocation && recommendedHospital
+    ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}(You)|${recommendedHospital.lat},${recommendedHospital.lon}(${encodeURIComponent(recommendedHospital.name)})&z=13&output=embed`
+    : '';
+
+  const pageStyle = {
+    background: 'linear-gradient(140deg, #06080f, #0d1f3a 55%, #123a6a)',
+    minHeight: '100vh',
+    padding: '20px',
+    color: '#f0f6ff',
+    fontFamily: 'Arial, sans-serif',
+  };
+
+  const containerStyle = {
+    maxWidth: '900px',
+    margin: '0 auto',
+    display: 'grid',
+    gap: '16px',
+  };
 
   const cardStyle = {
-    background: 'white',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '14px',
     padding: '16px',
-    borderRadius: '10px',
-    marginBottom: '16px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+    backdropFilter: 'blur(4px)',
   };
-  const calculateETA = (distance) => {
-    const speed = 40; // km/h
-    return Math.round((distance / speed) * 60);
+
+  const headingStyle = {
+    margin: '0 0 10px',
+    fontWeight: 'bold',
+    fontSize: '1.05rem',
   };
 
   return (
-    <div style={{ background: '#f5f7fa', minHeight: '100vh', padding: '20px' }}>
-      <div
-        style={{
-          maxWidth: '650px',
-          margin: '0 auto',
-          padding: '20px',
-          textAlign: 'center',
-          color: '#2f2f2f',
-          fontFamily: 'Arial, sans-serif',
-        }}
-      >
-        <h1 style={{ fontSize: '28px', marginBottom: '16px' }}>RescueNet AI+</h1>
+    <div style={pageStyle}>
+      <div style={containerStyle}>
+        <h1 style={{ fontSize: '28px', margin: 0, textAlign: 'center' }}>RescueNet AI+ Emergency Dashboard</h1>
 
         <div style={cardStyle}>
-          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>🚨 Emergency Dashboard</h3>
-          <p style={{ color: 'red', margin: '6px 0' }}>High: {stats.HIGH}</p>
-          <p style={{ color: 'orange', margin: '6px 0' }}>Medium: {stats.MEDIUM}</p>
-          <p style={{ color: 'green', margin: '6px 0' }}>Low: {stats.LOW}</p>
-        </div>
-
-        <div style={cardStyle}>
-          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Input + Voice</h3>
+          <h3 style={headingStyle}>Input + Voice</h3>
           <input
-            placeholder="Type: help, accident, fire"
+            placeholder="Type: help, accident, fire, bleeding"
             value={inputText}
             onChange={(e) => {
               const newText = e.target.value;
@@ -251,17 +295,19 @@ export default function App() {
               width: '100%',
               padding: '10px',
               borderRadius: '8px',
-              border: '1px solid #cfcfcf',
+              border: '1px solid #6f84aa',
               marginBottom: '12px',
               boxSizing: 'border-box',
+              background: '#f8fbff',
+              color: '#111',
             }}
           />
           <button
             onClick={startVoiceRecognition}
             disabled={isListening}
             style={{
-              background: '#e0e0e0',
-              color: '#333',
+              background: '#c9d6eb',
+              color: '#1a2233',
               border: 'none',
               borderRadius: '8px',
               padding: '10px 16px',
@@ -273,59 +319,75 @@ export default function App() {
         </div>
 
         <div style={cardStyle}>
-          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Priority</h3>
-          <p
-            style={{
-              color: priority === 'HIGH' ? 'red' : priority === 'MEDIUM' ? 'orange' : 'green',
-              fontWeight: 'bold',
-              margin: 0,
-            }}
-          >
+          <h3 style={headingStyle}>Priority</h3>
+          <p style={{ color: priority === 'HIGH' ? '#ff6b6b' : priority === 'MEDIUM' ? '#f7b267' : '#7ee787', margin: 0, fontWeight: 'bold' }}>
             Priority: {priority}
           </p>
-          <p style={{ marginTop: '8px' }}>Reason: {getReason(inputText)}</p>
         </div>
 
         <div style={cardStyle}>
-          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Hospital + Ambulance</h3>
-          {recommendedHospital && (
-            <p style={{ margin: '6px 0' }}>
-              Recommended Hospital: {recommendedHospital.name} (
-              {recommendedHospital.availability.charAt(0).toUpperCase() + recommendedHospital.availability.slice(1)}{' '}
-              availability)
+          <h3 style={headingStyle}>Explainable AI Reason</h3>
+          <p style={{ margin: 0 }}>Reason: {getReason(inputText)}</p>
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={headingStyle}>Suggested Hospital</h3>
+          {recommendedHospital ? (
+            <p style={{ margin: 0 }}>
+              {recommendedHospital.name} ({recommendedHospital.distance.toFixed(2)} km, {recommendedHospital.beds} beds available)
             </p>
-          )}
-          {nearestAmbulance && (
-            <p style={{ margin: '6px 0' }}>
-              🚑 Nearest Ambulance: {nearestAmbulance.name}
-              <br />
-              📞 Phone: {nearestAmbulance.phone}
-              <br />
-              📍 Distance: {nearestAmbulance.distance} km
-              <br />
-    ⏱️ ETA: {calculateETA(nearestAmbulance.distance)} minutes
-            </p>
-          )}
-          {nearestAmbulance && (
-            <a
-              href={`tel:${nearestAmbulance.phone}`}
-              style={{
-                display: 'inline-block',
-                background: '#e0e0e0',
-                color: '#222',
-                textDecoration: 'none',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                marginTop: '8px',
-              }}
-            >
-              Call Ambulance
-            </a>
+          ) : (
+            <p style={{ margin: 0 }}>No recommendation yet. Trigger SOS to calculate.</p>
           )}
         </div>
 
         <div style={cardStyle}>
-          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>SOS</h3>
+          <h3 style={headingStyle}>Nearest Ambulance</h3>
+          {nearestAmbulance ? (
+            <>
+              <p style={{ margin: '0 0 8px' }}>
+                🚑 {nearestAmbulance.name}
+                <br />
+                📍 {nearestAmbulance.distance.toFixed(2)} km away
+                <br />
+                ⏱️ ETA: {nearestAmbulance.eta} mins
+                <br />
+                📞 {nearestAmbulance.phone}
+              </p>
+              <a
+                href={`tel:${nearestAmbulance.phone}`}
+                style={{
+                  display: 'inline-block',
+                  background: '#2a3d5f',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                }}
+              >
+                Call Ambulance
+              </a>
+            </>
+          ) : (
+            <p style={{ margin: 0 }}>No ambulance selected yet.</p>
+          )}
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={headingStyle}>Location</h3>
+          <p style={{ margin: 0 }}>
+            Lat: {location.latitude ?? 'N/A'}, Lon: {location.longitude ?? 'N/A'}
+          </p>
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={headingStyle}>Emergency Dashboard</h3>
+          <p style={{ color: '#ff6b6b', margin: '6px 0' }}>High: {stats.HIGH}</p>
+          <p style={{ color: '#f7b267', margin: '6px 0' }}>Medium: {stats.MEDIUM}</p>
+          <p style={{ color: '#7ee787', margin: '6px 0' }}>Low: {stats.LOW}</p>
+        </div>
+
+        <div style={cardStyle}>
           <button
             onClick={() => sendSOS()}
             disabled={isSending}
@@ -334,8 +396,10 @@ export default function App() {
               color: '#fff',
               border: 'none',
               borderRadius: '8px',
-              padding: '10px 20px',
+              padding: '12px 24px',
               cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '1rem',
             }}
           >
             {isSending ? 'Sending...' : '🚨 SOS'}
@@ -343,29 +407,21 @@ export default function App() {
           <p style={{ marginTop: '12px' }}>{message}</p>
         </div>
 
-        {hasLocation && (
+        {hasLocation && recommendedHospital && (
           <div style={cardStyle}>
-            <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>Map</h3>
-            <p style={{ margin: '6px 0' }}>
-              Lat: {location.latitude}, Lon: {location.longitude}
-            </p>
+            <h3 style={headingStyle}>Map</h3>
             <iframe
               title="Location Map"
               src={mapUrl}
               width="100%"
-              height="240"
+              height="260"
               style={{ border: 0, borderRadius: '8px' }}
             />
-            <div style={{ marginTop: '10px' }}>
-              <strong>Nearby Hospitals:</strong>
-              <div>- Apollo</div>
-              <div>- Yashoda</div>
-            </div>
           </div>
         )}
 
         <div style={cardStyle}>
-          <h3 style={{ fontWeight: 'bold', marginTop: 0 }}>History</h3>
+          <h3 style={headingStyle}>History</h3>
           {history.map((h) => (
             <div key={h.id || `${h.latitude}-${h.longitude}-${h.timestamp || ''}`} style={{ marginBottom: '6px' }}>
               {h.latitude}, {h.longitude} {h.timestamp ? `(${new Date(h.timestamp).toLocaleString()})` : ''}
