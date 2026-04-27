@@ -7,6 +7,7 @@ export default function App() {
   const [location, setLocation] = useState({ latitude: null, longitude: null });
   const [history, setHistory] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [priority, setPriority] = useState('LOW');
   const [isSending, setIsSending] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -28,6 +29,21 @@ export default function App() {
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  // Detect AI severity priority from user text.
+  const detectPriority = (text) => {
+    const lower = text.toLowerCase();
+
+    if (lower.includes('accident') || lower.includes('fire')) {
+      return 'HIGH';
+    }
+
+    if (lower.includes('help')) {
+      return 'MEDIUM';
+    }
+
+    return 'LOW';
+  };
 
   // Get browser geolocation as a Promise.
   const getLocation = () =>
@@ -99,8 +115,20 @@ export default function App() {
       <input
         placeholder="Type: help, accident, fire"
         value={inputText}
-        onChange={(e) => setInputText(e.target.value)}
+        onChange={(e) => {
+          const newText = e.target.value;
+          setInputText(newText);
+          setPriority(detectPriority(newText));
+        }}
       />
+      <p
+        style={{
+          color: priority === 'HIGH' ? 'red' : priority === 'MEDIUM' ? 'orange' : 'green',
+          fontWeight: 'bold',
+        }}
+      >
+        Priority: {priority}
+      </p>
 
       <br />
       <br />
