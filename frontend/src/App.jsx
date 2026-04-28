@@ -45,15 +45,18 @@ const sendSOS = async () => {
       },
       body: JSON.stringify({
         message: inputText || "Emergency",
-        location: "Manual Location"   // 🔴 TEMP FIX
+        location: "Manual Location"
       })
     });
 
+    if (!res.ok) throw new Error("API failed");
+
     const data = await res.json();
     alert(data.message);
+
   } catch (err) {
     console.error(err);
-    alert("Something went wrong");
+    alert("Backend not responding");
   }
 };
 const TRIGGER_KEYWORDS = ['help', 'accident', 'fire', 'bleeding'];
@@ -589,7 +592,7 @@ onMouseLeave={(e) => {
             <div style={cardStyle}>
               <h3 style={headingStyle}>Location</h3>
               <p>
-                📍 {location.address || "Fetching address..."}
+                📍 {location?.address || "Fetching address..."}
               </p>
             </div>
 
@@ -610,7 +613,7 @@ onMouseLeave={(e) => {
           <p style={{ margin: '4px 0' }}>
             <strong>Hospital:</strong>{' '}
             {recommendedHospital
-              ? `${recommendedHospital.name} (${recommendedHospital.distance.toFixed(2)} km, ${recommendedHospital.beds} beds)`
+              ? `${recommendedHospital.name} (${recommendedHospital?.distance?.toFixed(2)} km, ${recommendedHospital.beds} beds)`
               : 'N/A'}
           </p>
           <p style={{ margin: '4px 0' }}>
