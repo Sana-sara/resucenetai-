@@ -1,53 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import "./App.css";
-
-export default function App() {
-
-  const API_BASE_URL = "https://resucenetai.onrender.com";
-
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/api/health`)
-      .then(res => res.json())
-      .then(data => console.log(data))
-      .catch(err => console.error(err));
-  }, []);
-
-  const sendSOS = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/sos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          message: "Emergency",
-          location: "Manual Location"
-        })
-      });
-
-      const data = await res.json();
-      setMessage(data.message);
-
-    } catch (err) {
-      console.error(err);
-      setMessage("Error sending SOS");
-    }
-  };
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h1>VitalLink AI</h1>
-
-      <button onClick={sendSOS}>
-        🚨 Send SOS
-      </button>
-
-      <p>{message}</p>
-    </div>
-  );
-}
+const API_BASE_URL = "https://resucenetai.onrender.com";
 const TRIGGER_KEYWORDS = ['help', 'accident', 'fire', 'bleeding'];
 
 
@@ -287,40 +240,42 @@ export default function App() {
 
   // AI auto-trigger if emergency keywords are typed.
   useEffect(() => {
-    const text = inputText.toLowerCase();
-    const match = TRIGGER_KEYWORDS.some((k) => text.includes(k));
+  const text = inputText.toLowerCase();
+  const match = TRIGGER_KEYWORDS.some((k) => text.includes(k));
 
-    if (match && text !== lastTriggeredText.current && !isSending) {
-      lastTriggeredText.current = text;
-      sendSOS('AI trigger');
-    }
-  }, [inputText, isSending]);
+  if (match && text !== lastTriggeredText.current && !isSending) {
+    lastTriggeredText.current = text;
+    sendSOS('AI trigger');
+  }
+}, [inputText, isSending]);
+  // AI auto-trigger if emergency keywords are typed.
   useEffect(() => {
-  if (!trackedAmbulance || !location.latitude) return;
+  if (!trackedAmbulance || location.latitude === null) return;
 
   const interval = setInterval(() => {
     setTrackedAmbulance((prev) => {
       if (!prev) return prev;
 
       const move = 0.02;
+      const threshold = 0.0005;
 
-      const newLat =
-        prev.lat + (location.latitude - prev.lat) * move;
+      const latDiff = location.latitude - prev.lat;
+      const lonDiff = location.longitude - prev.lon;
 
-      const newLon =
-        prev.lon + (location.longitude - prev.lon) * move;
+      if (Math.abs(latDiff) < threshold && Math.abs(lonDiff) < threshold) {
+        return prev; // stop when reached
+      }
 
       return {
         ...prev,
-        lat: newLat,
-        lon: newLon,
+        lat: prev.lat + latDiff * move,
+        lon: prev.lon + lonDiff * move,
       };
     });
   }, 1000);
 
   return () => clearInterval(interval);
-}, [location]);
-
+}, [location.latitude, location.longitude, trackedAmbulance]);
   const hasLocation = location.latitude !== null && location.longitude !== null;
   const mapUrl = hasLocation
   ? `https://maps.google.com/maps?q=${location.latitude},${location.longitude}&z=15&output=embed`
