@@ -13,11 +13,28 @@ const getAddressFromCoords = async (lat, lon) => {
     console.error("Address fetch error:", err);
     return "Address not found";
   }
-};
-useEffect(() => {
-  fetch(`${API_BASE_URL}/api/health`)
-    .then(res => res.json())
-    .then(data => console.log(data));
+};useEffect(() => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      // 🔥 get real address
+      const address = await getAddressFromCoords(lat, lon);
+
+      // 🔥 store everything
+      setLocation({
+        latitude: lat,
+        longitude: lon,
+        address: address
+      });
+
+      console.log("Address:", address);
+    },
+    (err) => {
+      console.error("Location error:", err);
+    });
+  }
 }, []);
 const sendSOS = async () => {
   const res = await fetch(`${API_BASE_URL}/api/sos`, {
@@ -26,9 +43,9 @@ const sendSOS = async () => {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      message: "Emergency! Need help",
-      location: "User Location"
-    })
+  message: inputText,
+  location: location.address || "Unknown Location"
+})
   });
 
   const data = await res.json();
@@ -562,8 +579,8 @@ onMouseLeave={(e) => {
 
             <div style={cardStyle}>
               <h3 style={headingStyle}>Location</h3>
-              <p style={{ margin: 0 }}>
-                Lat: {location.latitude ?? 'N/A'}, Lon: {location.longitude ?? 'N/A'}
+              <p>
+                📍 {location.address || "Fetching address..."}
               </p>
             </div>
 
