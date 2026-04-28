@@ -1,7 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
 import './App.css';
 
-const API_BASE_URL = 'https://resucenetai.onrender.com';
+const API_BASE_URL = "https://resucenetai.onrender.com";
+const getAddressFromCoords = async (lat, lon) => {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+    );
+    const data = await res.json();
+    return data.display_name;
+  } catch (err) {
+    console.error("Address fetch error:", err);
+    return "Address not found";
+  }
+};
+useEffect(() => {
+  fetch(`${API_BASE_URL}/api/health`)
+    .then(res => res.json())
+    .then(data => console.log(data));
+}, []);
+const sendSOS = async () => {
+  const res = await fetch(`${API_BASE_URL}/api/sos`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      message: "Emergency! Need help",
+      location: "User Location"
+    })
+  });
+
+  const data = await res.json();
+  alert(data.message);
+};
 const TRIGGER_KEYWORDS = ['help', 'accident', 'fire', 'bleeding'];
 
 
