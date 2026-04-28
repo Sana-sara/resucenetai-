@@ -1,64 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
-import './App.css';
+import { useEffect, useState } from "react";
+import "./App.css";
 
-const API_BASE_URL = "https://resucenetai.onrender.com";
-const getAddressFromCoords = async (lat, lon) => {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
-    );
-    const data = await res.json();
-    return data.display_name;
-  } catch (err) {
-    console.error("Address fetch error:", err);
-    return "Address not found";
-  }
-};useEffect(() => {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
+  const API_BASE_URL = "https://resucenetai.onrender.com";
 
-      // 🔥 get real address
-      const address = await getAddressFromCoords(lat, lon);
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/health`)
+      .then(res => res.json())
+      .then(data => console.log(data));
+  }, []);
 
-      // 🔥 store everything
-      setLocation({
-        latitude: lat,
-        longitude: lon,
-        address: address,
+  const sendSOS = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/sos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Emergency",
+          location: "Manual Location"
+        })
       });
 
-      console.log("Address:", address);
-    },
-    (err) => {
-      console.error("Location error:", err);
-    });
-  }
-}, []);
-const sendSOS = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/sos`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: inputText || "Emergency",
-        location: "Manual Location"
-      })
-    });
+      const data = await res.json();
+      alert(data.message);
 
-    if (!res.ok) throw new Error("API failed");
-
-    const data = await res.json();
-    alert(data.message);
-
-  } catch (err) {
-    console.error(err);
-    alert("Backend not responding");
-  }
-};
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong");
+    }
+  };
 const TRIGGER_KEYWORDS = ['help', 'accident', 'fire', 'bleeding'];
 
 
@@ -541,7 +512,7 @@ onMouseLeave={(e) => {
               <h3 style={headingStyle}>Suggested Hospital</h3>
               {recommendedHospital ? (
                 <p style={{ margin: 0 }}>
-                  {recommendedHospital.name} ({recommendedHospital.distance.toFixed(2)} km, {recommendedHospital.beds}{' '}
+                  {recommendedHospital.name} ({recommendedHospital?.distance?.toFixed(2)} km, {recommendedHospital.beds}{' '}
                   beds available)
                 </p>
               ) : (
