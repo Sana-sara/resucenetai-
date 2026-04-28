@@ -26,7 +26,7 @@ const getAddressFromCoords = async (lat, lon) => {
       setLocation({
         latitude: lat,
         longitude: lon,
-        address: address
+        address: address,
       });
 
       console.log("Address:", address);
@@ -37,19 +37,24 @@ const getAddressFromCoords = async (lat, lon) => {
   }
 }, []);
 const sendSOS = async () => {
-  const res = await fetch(`${API_BASE_URL}/api/sos`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-  message: inputText,
-  location: location.address || "Unknown Location"
-})
-  });
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/sos`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: inputText || "Emergency",
+        location: "Manual Location"   // 🔴 TEMP FIX
+      })
+    });
 
-  const data = await res.json();
-  alert(data.message);
+    const data = await res.json();
+    alert(data.message);
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong");
+  }
 };
 const TRIGGER_KEYWORDS = ['help', 'accident', 'fire', 'bleeding'];
 
@@ -70,7 +75,11 @@ const ambulances = [
 export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [trackedAmbulance, setTrackedAmbulance] = useState(null);
-  const [location, setLocation] = useState({ latitude: null, longitude: null });
+  const [location, setLocation] = useState({
+    latitude: null,
+    longitude: null,
+    address: ""
+  });
   const [history, setHistory] = useState([]);
   const [inputText, setInputText] = useState('');
   const [priority, setPriority] = useState('LOW');
