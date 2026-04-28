@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
+export default function App() {
+
   const API_BASE_URL = "https://resucenetai.onrender.com";
+
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/health`)
       .then(res => res.json())
-      .then(data => console.log(data));
+      .then(data => console.log(data))
+      .catch(err => console.error(err));
   }, []);
 
   const sendSOS = async () => {
@@ -23,13 +28,26 @@ import "./App.css";
       });
 
       const data = await res.json();
-      alert(data.message);
+      setMessage(data.message);
 
     } catch (err) {
       console.error(err);
-      alert("Something went wrong");
+      setMessage("Error sending SOS");
     }
   };
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h1>VitalLink AI</h1>
+
+      <button onClick={sendSOS}>
+        🚨 Send SOS
+      </button>
+
+      <p>{message}</p>
+    </div>
+  );
+}
 const TRIGGER_KEYWORDS = ['help', 'accident', 'fire', 'bleeding'];
 
 
